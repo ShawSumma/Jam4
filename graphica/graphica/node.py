@@ -1,9 +1,11 @@
 import cv2
+import numpy as np
 import colorsys
 from graphica.v2math import *
 
 phi = (5 ** 0.5 + 1) / 2
 
+hex_const = 2 / (3 ** 0.5)
 
 n = 0
 
@@ -71,7 +73,7 @@ class Node:
                     tuple((i*3+256)//4 for i in l.color[::-1]),
                     16
                 )
-                start = self.config('index-label', default=0.5)
+                start = self.config('index-label', default=1.0)
                 if len([i for i in self.list if not isinstance(i, SelectorOption)]) != 1:
                     size = cv2.getTextSize(str(lno+1), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_weight)[0]
                     cv2.putText(
@@ -90,13 +92,30 @@ class Node:
             else:
                 # size = 8
                 size = self.size
-            cv2.circle(
-                img,
-                [int(i) for i in self.pos],
-                int(size),
-                (int(self.color[2]), int(self.color[1]), int(self.color[0])),
-                cv2.FILLED
-            )
+            shape = self.config('shape', default=6)
+            if shape < 3:
+                cv2.circle(
+                    img,
+                    center=[int(i) for i in self.pos],
+                    radius=int(size),
+                    color=(int(self.color[2]), int(self.color[1]), int(self.color[0])),
+                    thickness=-1
+                )
+            else:
+                half = shape/2
+                points = []
+                for i in range(shape):
+                    x = math.cos(i * math.pi/half + math.pi/shape) * size * hex_const
+                    y = math.sin(i * math.pi/half + math.pi/shape) * size * hex_const
+                    x += self.pos[0]
+                    y += self.pos[1]
+                    points.append((int(x), int(y)))
+                points = np.array(points)
+                cv2.fillPoly(
+                    img,
+                    pts=[points],
+                    color=(int(self.color[2]), int(self.color[1]), int(self.color[0])),
+                )
         self.body(img)
         for l in self.list:
             l.config = self.config
@@ -106,10 +125,11 @@ class Node:
         font_size = self.config('font-size', default=0.5)
         font_weight = self.config('font-weight', default=1)
         if hasattr(self, 'text'):
-            size = cv2.getTextSize(self.text, cv2.FONT_HERSHEY_SIMPLEX, font_size, font_weight)[0]
+            text = self.text
+            size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_size, font_weight)[0]
             cv2.putText(
                 img,
-                self.text,
+                text,
                 [int(self.pos[0] - size[0]/2), int(self.pos[1] + size[1]/4)],
                 cv2.FONT_HERSHEY_SIMPLEX,
                 font_size,
@@ -122,7 +142,7 @@ class Node:
             cv2.putText(
                 img,
                 self.value,
-                [int(self.pos[0] - size[0]/2), int(self.pos[1] + size[1] + self.size)],
+                [int(self.pos[0] - size[0]/2), int(self.pos[1] + size[1] * 2 + self.size)],
                 cv2.FONT_HERSHEY_SIMPLEX,
                 font_size,
                 (0, 0, 0),
@@ -173,17 +193,22 @@ class Selector(Node):
         return ret
 
     def enter(self, pos):
-        option_offset = self.config('opt-offset', 1)
+        shape = self.config('shape', default=6)
+        if shape < 3:
+            shape = 60
+        else:
+            shape = 360/shape
+        option_offset = self.config('opt-offset', 1.0)
         self.oldcolor = self.color
         self.color = tuple((i + 255) / 2 for i in self.color)
         [x, y] = v2sub(pos, self.pos)
         angle = math.atan2(y, x)
         angle = math.degrees(angle)
-        angle = round(angle/60)*60
+        angle = round(angle/shape)*shape
         angle = math.radians(angle)
         for (v, c, n) in [
-                (-60, (64, 255, 64), 'add'),
-                (60, (255, 64, 64), 'del'),
+                (-shape, (64, 255, 64), 'add'),
+                (shape, (255, 64, 64), 'del'),
         ]:
             x = math.cos(angle + math.pi + math.radians(v)) * self.size * option_offset + self.pos[0]
             y = math.sin(angle + math.pi + math.radians(v)) * self.size * option_offset + self.pos[1]

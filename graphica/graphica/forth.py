@@ -84,10 +84,10 @@ class Env:
             a = self.stack.pop()
             b = self.stack.pop()
             self.stack.append(b and a)
-        elif word == 'lt' or word == '=' or word == '==':
+        elif word == 'eq' or word == '=' or word == '==':
             a = self.stack.pop()
             b = self.stack.pop()
-            self.stack.append(b < a)
+            self.stack.append(b == a)
         elif word == 'ne' or word == 'neq' or word == '!=' or word == '~=':
             a = self.stack.pop()
             b = self.stack.pop()

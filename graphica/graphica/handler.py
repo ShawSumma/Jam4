@@ -13,9 +13,17 @@ import graphica.save as save
 class Handler:
     def __init__(self, one_hand=True):
         parser = configparser.ConfigParser()
-        parser.read(pathlib.Path(__file__).parent / 'graphica.ini')
-        self.ini_force = parser['force'] if 'force' in parser.sections() else {}
-        self.ini_vars = parser['vars'] if 'vars' in parser.sections() else {}
+        try:
+            with open(pathlib.Path(__file__).parent.parent / 'saves/graphica.ini') as config:
+                parser.read_file(config)
+            self.ini_force = parser['force'] if 'force' in parser.sections() else {}
+            self.ini_vars = parser['vars'] if 'vars' in parser.sections() else {}
+        except IOError as ioe:
+            print(ioe)
+        except configparser.Error as cee:
+            self.ini_force = {}
+            self.ini_vars = {}
+            print(cee)
         def mouse_cb(who_cares, x, y, *who_cares_two_electic_boogaloo):
             self.mouse_xy = [x, y]
         self.window_name = cv2.namedWindow('Graphica')
@@ -30,8 +38,6 @@ class Handler:
         self.selected = []
         self.mouse_xy = None
         self.env = Env()
-        for key in self.ini_vars:
-            self.env.defs[key] = self.override[key]
         if one_hand:
             self.cap = cv2.VideoCapture(0)
             if "FindHands" not in globals():
@@ -51,16 +57,25 @@ class Handler:
 
     def config(self, var, default=None):
         if var in self.ini_force:
-            return type(default)(self.override[var])
+            return type(default)(self.ini_force[var])
         elif var in self.env.defs:
-            return type(default)(self.env.defs[var])
+            check = self.env.defs[var]
+            while not isinstance(default, str) and isinstance(check, str):
+                self.env.depth = 0
+                self.env.stack = []
+                for i in self.env.defs[var].split():
+                    self.env.run(i)
+                if self.env.stack[-1] == check:
+                    break
+                check = self.env.stack.pop()
+            return type(default)(check)
         else:
             return default
 
     def data_load(self, src):
         self.env.defs = json.loads(src)
         for key in self.ini_vars:
-            self.env.defs[key] = self.override[key]
+            self.env.defs[key] = self.ini_force[key]
 
     def code_loads(self, src):
         self.node = save.load_post(self, json.loads(src))
@@ -77,6 +92,8 @@ class Handler:
         self.env.defs = data['env']
         self.node = save.load_post(self, data['node'])
         self.node.root = True
+        for key in self.ini_vars:
+            self.env.defs[key] = self.ini_vars[key]
         
     def full_save(self):
         return json.dumps({
@@ -98,10 +115,11 @@ class Handler:
             self.node_remove(data)
 
     def node_on_add(self, data):
+        llen = self.config('line-len', 0.5)
         size = data['self'].size
         angle = data['angle']
-        x = math.cos(angle) * (size * 2.5)
-        y = math.sin(angle) * (size * 2.5)
+        x = math.cos(angle) * (size * (2 + llen))
+        y = math.sin(angle) * (size * (2 + llen))
         xy = [x, y]
         dpos = data['self'].pos
         res = v2add(xy, dpos)
