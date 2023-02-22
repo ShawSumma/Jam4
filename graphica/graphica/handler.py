@@ -163,7 +163,7 @@ class Handler:
                     self.selected[0].list[:] = []
                 elif chr(key).isprintable():
                     self.selected[0].text += chr(key)
-                elif key == 127:
+                elif key == 127 or key == 8:
                     if len(self.selected[0].text) != 0:
                         self.selected[0].text = self.selected[0].text[:-1]
                 else:
@@ -171,7 +171,7 @@ class Handler:
             else:
                 if chr(key).isprintable():
                     self.src.append(chr(key))
-                elif key == 127:
+                elif key == 127 or key == 8:
                     if len(self.src) != 0:
                         self.src.pop(-1)
                 else:
